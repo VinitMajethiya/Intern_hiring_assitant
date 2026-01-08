@@ -1,0 +1,16 @@
+# Environment variables
+.env
+
+# Python compilation
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+env/
+
+# System files
+.DS_Store
+
+# User-specific data (simulated DB)
+anonymized_records.json
