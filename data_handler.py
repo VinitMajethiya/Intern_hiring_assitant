@@ -10,8 +10,8 @@ def anonymize_data(candidate_info):
     Creates an anonymized copy of the candidate info.
     Removes direct PII (Name, Email, Phone) and generates a UUID.
     """
-    if not candidate_info:
-        return None
+    if candidate_info is None:
+        candidate_info = {}
 
     # explicit copy to avoid modifying the session state object if passed directly
     data = candidate_info.copy()
@@ -27,30 +27,29 @@ def anonymize_data(candidate_info):
         "position": data.get("Position"),
         "location": data.get("Location"), # Location can be semi-sensitive, but usually city-level is okay for aggregation. 
                                           # For strict GDPR, we might generalize or remove this too. Keeping for now.
-        "tech_stack": data.get("Tech Stack"),
-        # We explicitly DO NOT include Name, Email, Phone
-        "pii_removed": True
+        "tech_stack": data.get("tech_stack"),
+        
+        # PII Storage (Admin Access Only)
+        "personal_info": {
+            "name": data.get("user_name"),
+            "email": data.get("email"),
+            "phone": data.get("phone")
+        },
+        "pii_removed": False # Now storing PII for Admin access
     }
     
     return anonymized_record
 
-def save_session_data(candidate_info, messages):
+    anonymized_record["conversation_history"] = conversation_log
+
+def save_session_data(candidate_info, messages, sentiment_summary=None, evaluation=None):
     """
-    Saves the anonymized candidate data and the conversation transcript.
-    The transcript itself might contain PII if the user typed it, 
-    so in a real system we would run a PII scrubber on the text too.
-    For this 'Simulated' requirement, we will just save the structured anonymized info
-    and a flag that transcript is stored (or store it if needed for the 'technical responses').
+    Saves the anonymized candidate data, conversation transcript, optional sentiment summary, and evaluation.
     """
     anonymized_record = anonymize_data(candidate_info)
     if not anonymized_record:
         return
 
-    # Extract Q&A pairs might be redundant if we just dump the chat, 
-    # but let's try to extract technical content if possible. 
-    # For now, we save the full conversation history attached to the anonymized ID.
-    # Note: In a PROD GDPR environment, we'd scrub the 'messages' text too.
-    
     conversation_log = []
     for msg in messages:
         role = "unknown"
@@ -63,6 +62,12 @@ def save_session_data(candidate_info, messages):
         conversation_log.append({"role": role, "content": content})
 
     anonymized_record["conversation_history"] = conversation_log
+    
+    if sentiment_summary:
+        anonymized_record["sentiment_summary"] = sentiment_summary
+        
+    if evaluation:
+        anonymized_record["evaluation"] = evaluation
 
     # Atomic-ish write to JSON file
     records = []
@@ -79,3 +84,37 @@ def save_session_data(candidate_info, messages):
         json.dump(records, f, indent=2)
 
     return anonymized_record["record_id"]
+
+def get_session_data(record_id):
+    """
+    Retrieves a past session record by ID.
+    """
+    if not os.path.exists(DATA_FILE):
+        return None
+        
+    try:
+        with open(DATA_FILE, "r") as f:
+            records = json.load(f)
+            
+        for record in records:
+            if record.get("record_id") == record_id:
+                return record
+    except (json.JSONDecodeError, IOError):
+        pass
+        
+    return None
+
+def get_all_records():
+    """
+    Retrieves all session records for the Admin Dashboard.
+    """
+    if not os.path.exists(DATA_FILE):
+        return []
+        
+    try:
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        pass
+        
+    return []
