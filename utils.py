@@ -11,6 +11,12 @@ load_dotenv()
 def get_llm():
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
+        try:
+            api_key = st.secrets["GROQ_API_KEY"]
+        except (KeyError, FileNotFoundError):
+            api_key = None
+            
+    if not api_key:
         return None
     # using llama-3.3-70b-versatile which is the latest supported model
     return ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.7, groq_api_key=api_key)
