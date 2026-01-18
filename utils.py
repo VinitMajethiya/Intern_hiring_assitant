@@ -29,12 +29,16 @@ def generate_questions(tech_stack):
 def get_conversation_response(messages):
     llm = get_llm()
     if not llm:
-        return "System Error: Groq API Key is missing. Please provide it to continue."
+        yield "System Error: Groq API Key is missing. Please provide it to continue."
+        return
     
     # Return a generator for streaming
-    return llm.stream(messages)
-
-    return {"tech_stack": None}
+    try:
+        for chunk in llm.stream(messages):
+            if hasattr(chunk, "content"):
+                yield chunk.content
+    except Exception as e:
+        yield f"Connection Error: {str(e)}"
 
 def analyze_conversation(history_text):
     """
